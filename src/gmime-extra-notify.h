@@ -22,15 +22,32 @@
 #include <gmime/gmime-message.h>
 
 typedef enum {
+  GMIME_EXTRA_DELIVERY_FAILED,
+  GMIME_EXTRA_DELIVERY_DELAYED,
+  GMIME_EXTRA_DELIVERY_DELIVERED,
+  GMIME_EXTRA_DELIVERY_RELAYED,
+  GMIME_EXTRA_DELIVERY_EXPANDED
+} GMimeExtraDeliveryAction;
+
+typedef struct GMimeExtraDeliveryStatus {
+  GMimeExtraDeliveryAction action;
+  int status;
+  char *mid;
+} GMimeExtraDeliveryStatus;
+
+// TODO: add these
+typedef enum {
+  GMIME_EXTRA_NOTIFICATION_NONE,
   GMIME_EXTRA_NOTIFICATION_REQUIRED,
   GMIME_EXTRA_NOTIFICATION_OPTIONAL
 } GMimeExtraNotificationParameter;
 
-GMimeMessage *g_mime_message_make_notification(GMimeMessage *message);
-gboolean g_mime_message_is_notification(GMimeMessage *message);
+GMimeMessage *g_mime_extra_message_make_notification_response(
+    GMimeMessage *message, InternetAddressMailbox *from,
+    InternetAddressMailbox *to, const char *ua);
 
-const char *g_mime_message_notification_id(GMimeMessage *message);
-gboolean g_mime_message_notification_compare(GMimeMessage *message,
-                                             GMimeMessage *notification);
+char *
+g_mime_extra_message_notification(GMimeMessage *message);
+// GMimeExtraDeliveryStatus *g_mime_extra_message_delivery(GMimeMessage *message);
 
 #endif /* _GMIME_EXTRA_ADDRESS_NOTIFY_H_ */

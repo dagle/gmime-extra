@@ -7,7 +7,39 @@
 #include <gmime/gmime-utils.h>
 #include <gmime/internet-address.h>
 
-GMimeMessage *g_mime_message_make_notification_response(
+
+/**
+ * g_mime_extra_address_fqdn:
+ * @mb: the senders #InternetAddressMailbox to grab the fqdn from
+ *
+ * grab the fdqn from th a mailbox
+ *
+ * Returns: (nullable): the fdqn
+ **/
+const char *g_mime_extra_address_fqdn(InternetAddressMailbox *mb) {
+	const char *fdqn;
+	const char *addr = internet_address_mailbox_get_idn_addr(mb);
+	// const char *addr = internet_address_mailbox_get_addr(mb);
+
+	g_return_val_if_fail(addr, NULL);
+
+	fdqn = addr + mb->at + 1;
+	return fdqn;
+}
+
+/**
+ * g_mime_extra_message_make_notification_response:
+ * @message: a #GMimeMessage to reference
+ * @from: Our email address
+ * @to: their email address
+ * @ua: the name of the user-agent or %NULL
+ *
+ * Creates an message disposition-notification response for a message
+ * for the specified reciever.
+ *
+ * Returns: (nullable) (transfer full): A message containing disposition-notification response
+ **/
+GMimeMessage *g_mime_extra_message_make_notification_response(
     GMimeMessage *message, InternetAddressMailbox *from,
     InternetAddressMailbox *to, const char *ua) {
   GMimeMessage *notification;
@@ -27,12 +59,13 @@ GMimeMessage *g_mime_message_make_notification_response(
                              INTERNET_ADDRESS(to)->name, to->addr);
 
   char *from_str = internet_address_to_string(INTERNET_ADDRESS(from), NULL, 0);
-  // TODO: free date?
+
   GDateTime *date = g_mime_message_get_date(message);
   char *date_str = g_mime_utils_header_format_date(date);
 
-  // TODO: generate mid
-  // prologe = g_string_new("");
+  char *mid = g_mime_utils_generate_message_id(g_mime_extra_address_fqdn(from));
+  g_mime_message_set_message_id(notification, mid);
+  free(mid);
 
   prologe = g_strdup_printf(
       "The message sent on %s to %s with subject"
@@ -52,7 +85,9 @@ GMimeMessage *g_mime_message_make_notification_response(
   g_free(prologe);
 
   part = g_mime_part_new_with_type("message", "disposition-notification");
-  g_mime_object_set_header(GMIME_OBJECT(part), "Reporting-UA", ua, NULL);
+  if (ua) {
+	  g_mime_object_set_header(GMIME_OBJECT(part), "Reporting-UA", ua, NULL);
+  }
 
   char *recipient;
   recipient = g_strdup_printf("rfc822;%s", from->addr);
@@ -85,10 +120,41 @@ GMimeMessage *g_mime_message_make_notification_response(
   return notification;
 }
 
-void g_mime_message_request_notification(GMimeMessage *message,
+/**
+ * g_mime_extra_message_get_disposition_notification:
+ * @message: a #GMimeMessage to reference
+ * @mbox: email we want the response to
+ *
+ * Inserts a disposition notification into the email from address.
+ * from the specified mailbox
+ *
+ **/
+void g_mime_extra_message_get_disposition_notification(GMimeMessage *message) {
+	const char *hnt;
+	const char *hno;
+	g_return_if_fail(GMIME_IS_MESSAGE(message));
+
+	hnt = g_mime_object_get_header(GMIME_OBJECT(message), "Disposition-Notification-To");
+	hno = g_mime_object_get_header(GMIME_OBJECT(message), "Disposition-Notification-Option");
+
+	// return info if we should ask or not.
+	// return info if we should
+}
+
+/**
+ * g_mime_extra_message_get_disposition_notification:
+ * @message: a #GMimeMessage to reference
+ * @mbox: email we want the response to
+ *
+ * Inserts a disposition notification into the email from address.
+ * from the specified mailbox
+ *
+ **/
+void g_mime_extra_message_set_disposition_notification(GMimeMessage *message,
                                          InternetAddressMailbox *mbox) {
 
   g_return_if_fail(GMIME_IS_MESSAGE(message));
+  g_return_if_fail(INTERNET_ADDRESS_IS_MAILBOX(mbox));
 
   char *str = internet_address_to_string(INTERNET_ADDRESS(mbox), NULL, FALSE);
 
@@ -100,50 +166,27 @@ void g_mime_message_request_notification(GMimeMessage *message,
   g_free(str);
 }
 
-gboolean g_mime_message_has_request_notification(GMimeMessage *message) {
-  const char *dnt;
-  const char *rp;
 
-  g_return_val_if_fail(GMIME_IS_MESSAGE(message), FALSE);
 
-  dnt = g_mime_object_get_header(GMIME_OBJECT(message),
-                                 "Disposition-Notification-To");
-  rp = g_mime_object_get_header(GMIME_OBJECT(message), "Return-Path");
-
-  if (dnt == NULL || rp == NULL) {
-    return FALSE;
-  }
-
-  // TODO: compare case-sensitive (local) and case-insensitive (domain)
-  // check for number of addresses == 1
-  if (strcmp(dnt, rp)) {
-    return FALSE;
-  }
-
-  return TRUE;
-}
-
-typedef struct GMimeExtraDeliveryStatus {
-  int action;
-  int status;
-  char *mid;
-} GMimeExtraDeliveryStatus;
+// G_DEFINE_BOXED_TYPE (GMimeParserOptions, g_mime_parser_options, g_mime_parser_options_clone, g_mime_parser_options_free)
 
 /**
  * g_mime_extra_message_notification:
- * @encode: %true if the filter should encode or %false otherwise
+ * @message: message we try to find a notification from
  *
- * If @encode is %true, then all lines will be prefixed by "> ",
- * otherwise any lines starting with "> " will have that removed
+ * Tries to extra the original message-id from a message
+ * of type Content-Type: multipart/report; report-type=disposition-notification;
  *
- * Returns: a new reply filter with @encode.
+ * Returns: (nullable): returns message-id of the original message or %NULL
+ * if it's not a message-disposition-notification 
  **/
-GMimeExtraDeliveryStatus *
+char *
 g_mime_extra_message_notification(GMimeMessage *message) {
   GMimeObject *root, *part;
   GMimeMultipart *report;
   GMimeContentType *ct;
   const char *report_type;
+  const char *mid;
 
   g_return_val_if_fail(GMIME_IS_MESSAGE(message), NULL);
 
@@ -156,16 +199,13 @@ g_mime_extra_message_notification(GMimeMessage *message) {
   g_return_val_if_fail(ct, NULL);
 
   if (strcmp(ct->type, "multipart") || strcmp(ct->subtype, "report")) {
-    return FALSE;
+    return NULL;
   }
   report_type = g_mime_object_get_content_type_parameter(root, "report-type");
+
   g_return_val_if_fail(report_type, NULL);
-
   g_return_val_if_fail(g_mime_multipart_get_count(report) >= 3, NULL);
-
-  if (strcmp(report_type, "disposition-notification")) {
-    return FALSE;
-  }
+  g_return_val_if_fail(strcmp(report_type, "disposition-notification"), NULL);
 
   part = g_mime_multipart_get_part(report, 1);
   g_return_val_if_fail(part, NULL);
@@ -177,24 +217,26 @@ g_mime_extra_message_notification(GMimeMessage *message) {
       strcmp(ct->subtype, "disposition-notification")) {
     return NULL;
   }
-  return NULL;
-  /* return part; */
+  mid = g_mime_object_get_header(part, "Original-Message-ID");
+  return g_mime_utils_decode_message_id(mid);
 }
 
 /**
  * g_mime_extra_message_delivery:
- * @encode: %true if the filter should encode or %false otherwise
+ * @message: A message to check for a message delivery
  *
- * If @encode is %true, then all lines will be prefixed by "> ",
- * otherwise any lines starting with "> " will have that removed
+ * Tries to extract the delivery status of a message
+ * of type multipart/report; report-type=delivery-status
  *
- * Returns: a new reply filter with @encode.
+ * Returns: (nullable): returns a delivery status of the message or %NULL
+ * if it's not a message-delivery-status 
  **/
 GMimeExtraDeliveryStatus *g_mime_extra_message_delivery(GMimeMessage *message) {
-  GMimeObject *root, *part;
+  GMimeObject *root, *part, *old_part;
   GMimeMultipart *report;
   GMimeContentType *ct;
   const char *report_type;
+  GMimeMessage *old_message;
 
   g_return_val_if_fail(GMIME_IS_MESSAGE(message), NULL);
 
@@ -207,16 +249,13 @@ GMimeExtraDeliveryStatus *g_mime_extra_message_delivery(GMimeMessage *message) {
   g_return_val_if_fail(ct, NULL);
 
   if (strcmp(ct->type, "multipart") || strcmp(ct->subtype, "report")) {
-    return FALSE;
+    return NULL;
   }
   report_type = g_mime_object_get_content_type_parameter(root, "report-type");
+
   g_return_val_if_fail(report_type, NULL);
-
   g_return_val_if_fail(g_mime_multipart_get_count(report) >= 3, NULL);
-
-  if (strcmp(report_type, "disposition-notification")) {
-    return FALSE;
-  }
+  g_return_val_if_fail(strcmp(report_type, "delivery-status"), NULL);
 
   part = g_mime_multipart_get_part(report, 1);
   g_return_val_if_fail(part, NULL);
@@ -225,23 +264,20 @@ GMimeExtraDeliveryStatus *g_mime_extra_message_delivery(GMimeMessage *message) {
   g_return_val_if_fail(ct, NULL);
 
   if (strcmp(ct->type, "message") ||
-      strcmp(ct->subtype, "disposition-notification")) {
+      strcmp(ct->subtype, "delivery-status")) {
     return NULL;
   }
+
+  old_part = g_mime_multipart_get_part(report, 2);
+  g_return_val_if_fail(GMIME_IS_MESSAGE_PART (old_part), NULL);
+
+  old_message = g_mime_message_part_get_message (GMIME_MESSAGE_PART(part));
+  // get message id
+  // date?
+  // get action
+  // status 
+  g_mime_message_get_message_id(old_message);
+
   return NULL;
   /* return part; */
-}
-
-/**
- * g_mime_message_notification_compare:
- * @encode: %true if the filter should encode or %false otherwise
- *
- * If @encode is %true, then all lines will be prefixed by "> ",
- * otherwise any lines starting with "> " will have that removed
- *
- * Returns: a new reply filter with @encode.
- **/
-gboolean g_mime_message_notification_compare(GMimeMessage *message,
-                                             GMimeMessage *notification) {
-  return FALSE;
 }
