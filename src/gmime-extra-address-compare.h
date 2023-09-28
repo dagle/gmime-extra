@@ -32,15 +32,18 @@ typedef enum {
 	GALORE_COMPARE_DOMAIN_IDN,
 } GaloreCompareDomain;
 
-InternetAddress *galore_address_sub_to_plus(InternetAddressMailbox *mb);
-InternetAddress *galore_address_plus_to_sub(InternetAddressMailbox *mb);
+InternetAddress *internet_address_clone(InternetAddress *ia);
+InternetAddressList *internet_address_list_clone(InternetAddressList *ia_list);
 
-gboolean galore_address_compare_domain(InternetAddressMailbox *mb1, 
-		InternetAddressMailbox *mb2, GaloreCompareDomain mode);
-
-gboolean galore_address_compare_local(InternetAddressMailbox *mb1, 
-	InternetAddressMailbox *mb2, const char *seperators, GaloreCompareLocal mode);
-
+// InternetAddress *galore_address_sub_to_plus(InternetAddressMailbox *mb);
+// InternetAddress *galore_address_plus_to_sub(InternetAddressMailbox *mb);
+//
+// gboolean galore_address_compare_domain(InternetAddressMailbox *mb1, 
+// 		InternetAddressMailbox *mb2, GaloreCompareDomain mode);
+//
+// gboolean galore_address_compare_local(InternetAddressMailbox *mb1, 
+// 	InternetAddressMailbox *mb2, const char *seperators, GaloreCompareLocal mode);
+//
 G_END_DECLS
 
 #endif /* _GALORE_ADDRESS_COMPARE_H_ */

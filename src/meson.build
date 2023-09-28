@@ -2,14 +2,14 @@ source_c = [
   'gmime-extra.c',
   'gmime-extra-filter-reply.c',
   'gmime-extra-notify.c',
-  # 'gmime-extra-address-compare.c',
+  'gmime-extra-address-compare.c',
   ]
 
 source_h = [
   'gmime-extra.h',
   'gmime-extra-filter-reply.h',
   'gmime-extra-notify.h',
-  # 'gmime-extra-address-compare.h',
+  'gmime-extra-address-compare.h',
   ]
 
 deps = [

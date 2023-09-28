@@ -22,6 +22,10 @@
 #include <gmime/gmime-message.h>
 #include <gmime/internet-address.h>
 
+G_BEGIN_DECLS
+
+#define GMIME_EXTRA_TYPE_MDN_REQUEST (g_mime_extra_mdn_request_get_type ())
+
 typedef enum {
   GMIME_EXTRA_DELIVERY_FAILED,
   GMIME_EXTRA_DELIVERY_DELAYED,
@@ -41,18 +45,49 @@ typedef struct GMimeExtraDeliveryStatus {
   char *mid;
 } GMimeExtraDeliveryStatus;
 
-typedef struct GMimeExtraMdnRequest {
-  InternetAddressList *recipients;
-  GMimeExtraNotificationParameter option;
-  gboolean ask;
-} GMimeExtraMdnRequest;
+typedef struct _GMimeExtraMdnRequest GMimeExtraMdnRequest;
+
+GType g_mime_extra_mdn_request_get_type (void);
+
+GMimeExtraMdnRequest *
+g_mime_extra_message_disposition_notification_new(void);
+
+GMimeExtraMdnRequest *
+g_mime_extra_message_disposition_notification_get(GMimeMessage *message);
+
+void g_mime_extra_message_disposition_notification_set(
+    GMimeMessage *message, InternetAddressMailbox *mbox);
+
+void g_mime_extra_disposition_notification_free (GMimeExtraMdnRequest *request);
+
+GMimeExtraMdnRequest *g_mime_extra_disposition_notification_clone (GMimeExtraMdnRequest *request);
+
+InternetAddressList *g_mime_extra_disposition_notification_get_recipents(
+		GMimeExtraMdnRequest *request);
+void g_mime_extra_disposition_notification_set_recipents(
+		GMimeExtraMdnRequest *request, InternetAddressList *recipients);
+
+const char *g_mime_extra_disposition_notification_get_option(
+		GMimeExtraMdnRequest *request);
+void g_mime_extra_disposition_notification_set_option(
+		GMimeExtraMdnRequest *request, const char *option);
+
+gboolean g_mime_extra_disposition_notification_get_ask(
+		GMimeExtraMdnRequest *request);
+void g_mime_extra_disposition_notification_set_ask(
+		GMimeExtraMdnRequest *request, gboolean ask);
+
+char *g_mime_extra_message_disposition_notification(GMimeMessage *message);
 
 GMimeMessage *g_mime_extra_message_make_notification_response(
     GMimeMessage *message, InternetAddressMailbox *from,
     InternetAddressMailbox *to, const char *ua);
 
-char *g_mime_extra_message_notification(GMimeMessage *message);
+
+
 // GMimeExtraDeliveryStatus *g_mime_extra_message_delivery(GMimeMessage
 // *message);
+
+G_END_DECLS
 
 #endif /* _GMIME_EXTRA_ADDRESS_NOTIFY_H_ */
