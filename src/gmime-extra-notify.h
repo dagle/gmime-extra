@@ -20,6 +20,7 @@
 #define _GMIME_EXTRA_ADDRESS_NOTIFY_H_
 
 #include <gmime/gmime-message.h>
+#include <gmime/internet-address.h>
 
 typedef enum {
   GMIME_EXTRA_DELIVERY_FAILED,
@@ -29,25 +30,29 @@ typedef enum {
   GMIME_EXTRA_DELIVERY_EXPANDED
 } GMimeExtraDeliveryAction;
 
+typedef enum {
+  GMIME_EXTRA_NOTIFICATION_REQUIRED,
+  GMIME_EXTRA_NOTIFICATION_OPTIONAL
+} GMimeExtraNotificationParameter;
+
 typedef struct GMimeExtraDeliveryStatus {
   GMimeExtraDeliveryAction action;
   int status;
   char *mid;
 } GMimeExtraDeliveryStatus;
 
-// TODO: add these
-typedef enum {
-  GMIME_EXTRA_NOTIFICATION_NONE,
-  GMIME_EXTRA_NOTIFICATION_REQUIRED,
-  GMIME_EXTRA_NOTIFICATION_OPTIONAL
-} GMimeExtraNotificationParameter;
+typedef struct GMimeExtraMdnRequest {
+  InternetAddressList *recipients;
+  GMimeExtraNotificationParameter option;
+  gboolean ask;
+} GMimeExtraMdnRequest;
 
 GMimeMessage *g_mime_extra_message_make_notification_response(
     GMimeMessage *message, InternetAddressMailbox *from,
     InternetAddressMailbox *to, const char *ua);
 
-char *
-g_mime_extra_message_notification(GMimeMessage *message);
-// GMimeExtraDeliveryStatus *g_mime_extra_message_delivery(GMimeMessage *message);
+char *g_mime_extra_message_notification(GMimeMessage *message);
+// GMimeExtraDeliveryStatus *g_mime_extra_message_delivery(GMimeMessage
+// *message);
 
 #endif /* _GMIME_EXTRA_ADDRESS_NOTIFY_H_ */

@@ -7,7 +7,6 @@
 #include <gmime/gmime-utils.h>
 #include <gmime/internet-address.h>
 
-
 /**
  * g_mime_extra_address_fqdn:
  * @mb: the senders #InternetAddressMailbox to grab the fqdn from
@@ -17,16 +16,17 @@
  * Returns: (nullable): the fdqn
  **/
 const char *g_mime_extra_address_fqdn(InternetAddressMailbox *mb) {
-	const char *fdqn;
-	const char *addr = internet_address_mailbox_get_idn_addr(mb);
-	// const char *addr = internet_address_mailbox_get_addr(mb);
+  const char *fdqn;
+  const char *addr = internet_address_mailbox_get_idn_addr(mb);
+  // const char *addr = internet_address_mailbox_get_addr(mb);
 
-	g_return_val_if_fail(addr, NULL);
+  g_return_val_if_fail(addr, NULL);
 
-	fdqn = addr + mb->at + 1;
-	return fdqn;
+  fdqn = addr + mb->at + 1;
+  return fdqn;
 }
 
+// TODO: Add error
 /**
  * g_mime_extra_message_make_notification_response:
  * @message: a #GMimeMessage to reference
@@ -37,7 +37,8 @@ const char *g_mime_extra_address_fqdn(InternetAddressMailbox *mb) {
  * Creates an message disposition-notification response for a message
  * for the specified reciever.
  *
- * Returns: (nullable) (transfer full): A message containing disposition-notification response
+ * Returns: (nullable) (transfer full): A message containing
+ *disposition-notification response
  **/
 GMimeMessage *g_mime_extra_message_make_notification_response(
     GMimeMessage *message, InternetAddressMailbox *from,
@@ -50,6 +51,11 @@ GMimeMessage *g_mime_extra_message_make_notification_response(
 
   g_return_val_if_fail(GMIME_IS_MESSAGE(message), NULL);
   g_return_val_if_fail(INTERNET_ADDRESS_IS_MAILBOX(to), NULL);
+
+  // if this doesn't have an MDN header, we shouldn't generate a response
+  g_return_val_if_fail(g_mime_object_get_header(GMIME_OBJECT(message),
+                                                "Disposition-Notification-To"),
+                       NULL);
 
   notification = g_mime_message_new(TRUE);
 
@@ -86,7 +92,7 @@ GMimeMessage *g_mime_extra_message_make_notification_response(
 
   part = g_mime_part_new_with_type("message", "disposition-notification");
   if (ua) {
-	  g_mime_object_set_header(GMIME_OBJECT(part), "Reporting-UA", ua, NULL);
+    g_mime_object_set_header(GMIME_OBJECT(part), "Reporting-UA", ua, NULL);
   }
 
   char *recipient;
@@ -120,25 +126,50 @@ GMimeMessage *g_mime_extra_message_make_notification_response(
   return notification;
 }
 
+static GMimeExtraNotificationParameter parse_option(const char *option) {
+  if (!strncmp(option, "required", 6)) {
+    return GMIME_EXTRA_NOTIFICATION_REQUIRED;
+  }
+  return GMIME_EXTRA_NOTIFICATION_OPTIONAL;
+}
+
 /**
  * g_mime_extra_message_get_disposition_notification:
  * @message: a #GMimeMessage to reference
  * @mbox: email we want the response to
  *
- * Inserts a disposition notification into the email from address.
- * from the specified mailbox
+ * Get the disposition if there is
  *
  **/
-void g_mime_extra_message_get_disposition_notification(GMimeMessage *message) {
-	const char *hnt;
-	const char *hno;
-	g_return_if_fail(GMIME_IS_MESSAGE(message));
+GMimeExtraMdnRequest *
+g_mime_extra_message_get_disposition_notification(GMimeMessage *message) {
+  GMimeExtraMdnRequest *request;
+  const char *hnt;
+  const char *hno;
+  const char *ret;
+  gboolean ask = FALSE;
 
-	hnt = g_mime_object_get_header(GMIME_OBJECT(message), "Disposition-Notification-To");
-	hno = g_mime_object_get_header(GMIME_OBJECT(message), "Disposition-Notification-Option");
+  g_return_val_if_fail(GMIME_IS_MESSAGE(message), NULL);
 
-	// return info if we should ask or not.
-	// return info if we should
+  hnt = g_mime_object_get_header(GMIME_OBJECT(message),
+                                 "Disposition-Notification-To");
+  g_return_val_if_fail(hnt, NULL);
+
+  hno = g_mime_object_get_header(GMIME_OBJECT(message),
+                                 "Disposition-Notification-Option");
+
+  ret = g_mime_object_get_header(GMIME_OBJECT(message), "Return-Path");
+
+  if (!ret || strcmp(hnt, ret)) {
+    ask = TRUE;
+  }
+
+  request = g_slice_new(GMimeExtraMdnRequest);
+  request->ask = ask;
+  request->recipients = internet_address_list_parse(NULL, hno);
+  request->option = parse_option(hno);
+
+  return request;
 }
 
 /**
@@ -150,8 +181,8 @@ void g_mime_extra_message_get_disposition_notification(GMimeMessage *message) {
  * from the specified mailbox
  *
  **/
-void g_mime_extra_message_set_disposition_notification(GMimeMessage *message,
-                                         InternetAddressMailbox *mbox) {
+void g_mime_extra_message_set_disposition_notification(
+    GMimeMessage *message, InternetAddressMailbox *mbox) {
 
   g_return_if_fail(GMIME_IS_MESSAGE(message));
   g_return_if_fail(INTERNET_ADDRESS_IS_MAILBOX(mbox));
@@ -166,9 +197,8 @@ void g_mime_extra_message_set_disposition_notification(GMimeMessage *message,
   g_free(str);
 }
 
-
-
-// G_DEFINE_BOXED_TYPE (GMimeParserOptions, g_mime_parser_options, g_mime_parser_options_clone, g_mime_parser_options_free)
+// G_DEFINE_BOXED_TYPE (GMimeParserOptions, g_mime_parser_options,
+// g_mime_parser_options_clone, g_mime_parser_options_free)
 
 /**
  * g_mime_extra_message_notification:
@@ -178,10 +208,9 @@ void g_mime_extra_message_set_disposition_notification(GMimeMessage *message,
  * of type Content-Type: multipart/report; report-type=disposition-notification;
  *
  * Returns: (nullable): returns message-id of the original message or %NULL
- * if it's not a message-disposition-notification 
+ * if it's not a message-disposition-notification
  **/
-char *
-g_mime_extra_message_notification(GMimeMessage *message) {
+char *g_mime_extra_message_notification(GMimeMessage *message) {
   GMimeObject *root, *part;
   GMimeMultipart *report;
   GMimeContentType *ct;
@@ -229,7 +258,7 @@ g_mime_extra_message_notification(GMimeMessage *message) {
  * of type multipart/report; report-type=delivery-status
  *
  * Returns: (nullable): returns a delivery status of the message or %NULL
- * if it's not a message-delivery-status 
+ * if it's not a message-delivery-status
  **/
 GMimeExtraDeliveryStatus *g_mime_extra_message_delivery(GMimeMessage *message) {
   GMimeObject *root, *part, *old_part;
@@ -263,19 +292,18 @@ GMimeExtraDeliveryStatus *g_mime_extra_message_delivery(GMimeMessage *message) {
   ct = g_mime_object_get_content_type(part);
   g_return_val_if_fail(ct, NULL);
 
-  if (strcmp(ct->type, "message") ||
-      strcmp(ct->subtype, "delivery-status")) {
+  if (strcmp(ct->type, "message") || strcmp(ct->subtype, "delivery-status")) {
     return NULL;
   }
 
   old_part = g_mime_multipart_get_part(report, 2);
-  g_return_val_if_fail(GMIME_IS_MESSAGE_PART (old_part), NULL);
+  g_return_val_if_fail(GMIME_IS_MESSAGE_PART(old_part), NULL);
 
-  old_message = g_mime_message_part_get_message (GMIME_MESSAGE_PART(part));
+  old_message = g_mime_message_part_get_message(GMIME_MESSAGE_PART(part));
   // get message id
   // date?
   // get action
-  // status 
+  // status
   g_mime_message_get_message_id(old_message);
 
   return NULL;
